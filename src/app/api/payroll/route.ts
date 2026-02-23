@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
       bar_hours: h.bar_hours,
       coffee_hours: h.coffee_hours,
       wedding_hours: h.wedding_hours,
+      labor_hours: h.labor_hours || 0,
     }));
 
   if (hoursInserts.length > 0) {

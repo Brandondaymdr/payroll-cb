@@ -35,6 +35,7 @@ export interface EmployeeWeeklyHours {
   bar_hours: number;
   coffee_hours: number;
   wedding_hours: number;
+  labor_hours: number;
 }
 
 export interface PayrollResult {
@@ -59,6 +60,7 @@ export interface EmployeeHoursInput {
   bar_hours: number;
   coffee_hours: number;
   wedding_hours: number;
+  labor_hours: number;
 }
 
 // Calculation output per employee
@@ -78,6 +80,9 @@ export interface EmployeePayrollCalc {
   wedding_pay: number;
   coffee_pay: number;
   top_up_amount: number;
+  labor_hours: number;
+  gusto_hours_entry: number;
+  gusto_rate: number;
   gusto_tips_entry: number;
   gusto_wages_entry: number;
   total_pay: number;

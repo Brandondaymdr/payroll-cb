@@ -40,6 +40,7 @@ export default function NewPayrollPage() {
           bar_hours: 0,
           coffee_hours: 0,
           wedding_hours: 0,
+          labor_hours: 0,
         })));
         setLoading(false);
       });
@@ -141,7 +142,7 @@ export default function NewPayrollPage() {
           </div>
           <div className="space-y-4">
             <div>
-              <label className="label">Toast Tips (bar total for the week)</label>
+              <label className="label">Toast Tips (total from POS — includes coffee & wedding)</label>
               <div className="relative">
                 <span className="absolute left-3 top-2.5 text-gray-400">$</span>
                 <input
@@ -155,7 +156,7 @@ export default function NewPayrollPage() {
               </div>
             </div>
             <div>
-              <label className="label">Coffee Tips (Thu/Fri/Sat 7:30-12)</label>
+              <label className="label">Coffee Tips (Thu/Fri/Sat 7:30-12) — subset of Toast total</label>
               <div className="relative">
                 <span className="absolute left-3 top-2.5 text-gray-400">$</span>
                 <input
@@ -169,7 +170,7 @@ export default function NewPayrollPage() {
               </div>
             </div>
             <div>
-              <label className="label">Wedding Tips (if applicable)</label>
+              <label className="label">Wedding Tips (if applicable) — subset of Toast total</label>
               <div className="relative">
                 <span className="absolute left-3 top-2.5 text-gray-400">$</span>
                 <input
@@ -210,6 +211,7 @@ export default function NewPayrollPage() {
                   <th className="text-center py-3 px-2 font-semibold text-gray-700">Bar Hours</th>
                   <th className="text-center py-3 px-2 font-semibold text-gray-700">Coffee Hours</th>
                   <th className="text-center py-3 px-2 font-semibold text-gray-700">Wedding Hours</th>
+                  <th className="text-center py-3 px-2 font-semibold text-gray-700">Labor Hours</th>
                 </tr>
               </thead>
               <tbody>
@@ -223,7 +225,7 @@ export default function NewPayrollPage() {
                         {!emp?.is_coffee_worker ? (
                           <input
                             type="number"
-                            step="0.5"
+                            step="0.01"
                             min="0"
                             className="input text-center w-24 mx-auto"
                             value={h.bar_hours || ''}
@@ -237,7 +239,7 @@ export default function NewPayrollPage() {
                         {emp?.is_coffee_worker ? (
                           <input
                             type="number"
-                            step="0.5"
+                            step="0.01"
                             min="0"
                             className="input text-center w-24 mx-auto"
                             value={h.coffee_hours || ''}
@@ -251,11 +253,26 @@ export default function NewPayrollPage() {
                         {!emp?.is_coffee_worker ? (
                           <input
                             type="number"
-                            step="0.5"
+                            step="0.01"
                             min="0"
                             className="input text-center w-24 mx-auto"
                             value={h.wedding_hours || ''}
                             onChange={e => updateHours(idx, 'wedding_hours', parseFloat(e.target.value) || 0)}
+                          />
+                        ) : (
+                          <span className="text-gray-300 text-center block">—</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-2">
+                        {emp?.gusto_tips_only ? (
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="input text-center w-24 mx-auto"
+                            value={h.labor_hours || ''}
+                            onChange={e => updateHours(idx, 'labor_hours', parseFloat(e.target.value) || 0)}
+                            placeholder="Distillery"
                           />
                         ) : (
                           <span className="text-gray-300 text-center block">—</span>
@@ -294,8 +311,8 @@ export default function NewPayrollPage() {
                 <p className="text-xl font-bold text-pink-700">{fmt(calc.wedding_tips)}</p>
               </div>
               <div className="bg-emerald-50 rounded-lg p-4">
-                <p className="text-xs text-emerald-600 font-medium uppercase">Total Pool</p>
-                <p className="text-xl font-bold text-emerald-700">{fmt(calc.total_pool)}</p>
+                <p className="text-xs text-emerald-600 font-medium uppercase">Bar Tip Pool</p>
+                <p className="text-xl font-bold text-emerald-700">{fmt(calc.bar_tip_pool)}</p>
               </div>
             </div>
           </div>
@@ -352,28 +369,32 @@ export default function NewPayrollPage() {
 
           {/* Gusto Entry Summary */}
           <div className="card bg-blue-50 border-blue-200">
-            <h3 className="font-bold text-blue-900 mb-4">Gusto Entry Summary</h3>
-            <p className="text-sm text-blue-700 mb-3">Enter these amounts in Gusto for each employee:</p>
+            <h3 className="font-bold text-blue-900 mb-2">Gusto Entry Summary</h3>
+            <p className="text-sm text-blue-700 mb-4">Enter these in Gusto — Hours column (Gusto calculates wages) and Tips column (dollar amount):</p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b-2 border-blue-200 text-left">
                     <th className="py-2 px-2 text-blue-800">Employee</th>
-                    <th className="py-2 px-2 text-right text-blue-800">Gusto Wages</th>
-                    <th className="py-2 px-2 text-right text-blue-800">Gusto Tips</th>
-                    <th className="py-2 px-2 text-right text-blue-800">Notes</th>
+                    <th className="py-2 px-2 text-right text-blue-800">Hours</th>
+                    <th className="py-2 px-2 text-right text-blue-800">Rate</th>
+                    <th className="py-2 px-2 text-right text-blue-800">Tips</th>
+                    <th className="py-2 px-2 text-right text-blue-800">Top-up</th>
+                    <th className="py-2 px-2 text-blue-800">Notes</th>
                   </tr>
                 </thead>
                 <tbody>
                   {calc.employees.map(e => (
                     <tr key={e.employee_id} className="border-b border-blue-100">
                       <td className="py-2.5 px-2 font-medium text-blue-900">{e.employee_name}</td>
-                      <td className="py-2.5 px-2 text-right font-mono">{fmt(e.gusto_wages_entry)}</td>
-                      <td className="py-2.5 px-2 text-right font-mono">{fmt(e.gusto_tips_entry)}</td>
-                      <td className="py-2.5 px-2 text-right text-xs text-blue-600">
-                        {e.gusto_tips_only && 'All as tips (dual role)'}
-                        {e.is_coffee_worker && 'Coffee bar'}
-                        {e.tip_rate_multiplier < 1 && '25% tip rate'}
+                      <td className="py-2.5 px-2 text-right font-mono font-bold">{e.gusto_hours_entry > 0 ? e.gusto_hours_entry : '—'}</td>
+                      <td className="py-2.5 px-2 text-right font-mono text-blue-600">{e.gusto_rate > 0 ? fmt(e.gusto_rate) + '/hr' : '—'}</td>
+                      <td className="py-2.5 px-2 text-right font-mono font-bold">{e.gusto_tips_entry > 0 ? fmt(e.gusto_tips_entry) : '—'}</td>
+                      <td className="py-2.5 px-2 text-right font-mono">{e.top_up_amount > 0 ? fmt(e.top_up_amount) : '—'}</td>
+                      <td className="py-2.5 px-2 text-xs text-blue-600">
+                        {e.gusto_tips_only && `Labor ${e.labor_hours}hrs @$22 + bar/wedding comp as tips`}
+                        {e.is_coffee_worker && 'Coffee bar · $20/hr min'}
+                        {!e.gusto_tips_only && !e.is_coffee_worker && e.tip_rate_multiplier < 1 && '25% tip rate'}
                       </td>
                     </tr>
                   ))}

@@ -13,7 +13,15 @@ import { Employee, EmployeeHoursInput, PayrollCalculation, EmployeePayrollCalc }
  * 7. Everyone else gets final_tip_rate × their hours
  * 8. Josh gets initial_tip_rate × 0.25 × his hours
  * 9. Coffee tips → 100% to Indigo with $20/hr minimum guarantee
+ *    (minimum = $20/hr total comp, i.e. base $15/hr + tips must reach $20/hr)
  * 10. Wedding tips → split equally among wedding workers + $30/hr base
+ *
+ * Gusto Entry:
+ * - Hours column = actual hours (Gusto calculates wages from rate × hours)
+ * - Tips column = dollar amount
+ * - Andrew: Hours = labor/distillery hours at $22/hr; Tips = (bar_hrs × $15 + bar tips + wedding_hrs × $30 + wedding tips)
+ * - Indigo: Hours = coffee hours at $15/hr; Tips = coffee tips; top-up shown separately
+ * - Everyone else: Hours = bar hours at $15/hr; Tips = tip share + wedding pay
  */
 export function calculatePayroll(
   toastTips: number,
@@ -30,10 +38,6 @@ export function calculatePayroll(
   // Build a lookup from employee_id to employee data
   const employeeMap = new Map<string, Employee>();
   employees.forEach(e => employeeMap.set(e.id, e));
-
-  // Build hours lookup
-  const hoursMap = new Map<string, EmployeeHoursInput>();
-  hours.forEach(h => hoursMap.set(h.employee_id, h));
 
   // Determine who works at the bar this week (has bar_hours > 0 and is not coffee-only)
   const barWorkers: { employee: Employee; hours: EmployeeHoursInput }[] = [];
@@ -82,7 +86,7 @@ export function calculatePayroll(
     if (!emp) continue;
 
     // Skip if employee has zero hours across all categories
-    if (h.bar_hours === 0 && h.coffee_hours === 0 && h.wedding_hours === 0) continue;
+    if (h.bar_hours === 0 && h.coffee_hours === 0 && h.wedding_hours === 0 && (h.labor_hours || 0) === 0) continue;
 
     const calc: EmployeePayrollCalc = {
       employee_id: emp.id,
@@ -91,6 +95,7 @@ export function calculatePayroll(
       bar_hours: h.bar_hours,
       coffee_hours: h.coffee_hours,
       wedding_hours: h.wedding_hours,
+      labor_hours: h.labor_hours || 0,
       hourly_rate: emp.hourly_rate,
       tip_rate_multiplier: emp.tip_rate_multiplier,
       is_coffee_worker: emp.is_coffee_worker,
@@ -100,6 +105,8 @@ export function calculatePayroll(
       wedding_pay: 0,
       coffee_pay: 0,
       top_up_amount: 0,
+      gusto_hours_entry: 0,
+      gusto_rate: 0,
       gusto_tips_entry: 0,
       gusto_wages_entry: 0,
       total_pay: 0,
@@ -128,39 +135,48 @@ export function calculatePayroll(
     // --- Coffee pay (Indigo) ---
     if (emp.is_coffee_worker && h.coffee_hours > 0) {
       calc.coffee_pay = round2(coffeeTips);
-      // $20/hr minimum guarantee
-      const effectiveRate = h.coffee_hours > 0 ? coffeeTips / h.coffee_hours : 0;
-      if (effectiveRate < 20) {
-        calc.top_up_amount = round2((20 - effectiveRate) * h.coffee_hours);
-      }
-      // Indigo's base wages for coffee hours
+      // $20/hr minimum guarantee: base wage ($15/hr) + tips must reach $20/hr
       calc.base_wages = round2(h.coffee_hours * emp.hourly_rate);
+      const totalPerHour = (calc.base_wages + coffeeTips) / h.coffee_hours;
+      if (totalPerHour < 20) {
+        calc.top_up_amount = round2((20 - totalPerHour) * h.coffee_hours);
+      }
     }
 
     // --- Gusto entries ---
+    // Gusto Hours = actual hours to enter (Gusto calculates wages from rate × hours)
+    // Gusto Tips = dollar amount to enter in tips column
     if (emp.gusto_tips_only) {
-      // Andrew: all bar compensation goes to Gusto Tips
-      const barTotal = round2(calc.base_wages + calc.tip_share);
-      const weddingTotal = calc.wedding_pay;
-      calc.gusto_tips_entry = round2(barTotal + weddingTotal);
-      calc.gusto_wages_entry = 0;
+      // Andrew: labor hours go to Gusto Hours at $22/hr
+      // All bar + wedding compensation goes to Gusto Tips
+      calc.gusto_hours_entry = h.labor_hours || 0;
+      calc.gusto_rate = 22;
+      // Tips = (bar_hrs × $15) + tip_share + (wedding_hrs × $30) + wedding_tips
+      const barComp = round2(h.bar_hours * emp.hourly_rate + calc.tip_share);
+      const weddingComp = calc.wedding_pay;
+      calc.gusto_tips_entry = round2(barComp + weddingComp);
+      calc.gusto_wages_entry = round2((h.labor_hours || 0) * 22); // for reference/total_pay
     } else if (emp.is_coffee_worker) {
-      // Indigo: coffee pay + top-up as wages, base wages separate
-      calc.gusto_wages_entry = round2(calc.base_wages + calc.top_up_amount);
+      // Indigo: coffee hours at $15/hr + tips + top-up
+      calc.gusto_hours_entry = h.coffee_hours;
+      calc.gusto_rate = emp.hourly_rate;
       calc.gusto_tips_entry = round2(calc.coffee_pay);
+      calc.gusto_wages_entry = round2(calc.base_wages + calc.top_up_amount);
     } else {
-      // Standard employees
-      calc.gusto_wages_entry = round2(calc.base_wages);
+      // Standard employees: bar hours at $15/hr
+      calc.gusto_hours_entry = h.bar_hours;
+      calc.gusto_rate = emp.hourly_rate;
       calc.gusto_tips_entry = round2(calc.tip_share + calc.wedding_pay);
+      calc.gusto_wages_entry = round2(calc.base_wages);
     }
 
     calc.total_pay = round2(
       calc.base_wages + calc.tip_share + calc.wedding_pay + calc.coffee_pay + calc.top_up_amount
     );
 
-    // For Andrew, avoid double-counting base_wages in total since it's folded into gusto_tips
+    // For Andrew, total = gusto wages (labor) + gusto tips (bar+wedding comp)
     if (emp.gusto_tips_only) {
-      calc.total_pay = round2(calc.gusto_tips_entry);
+      calc.total_pay = round2(calc.gusto_wages_entry + calc.gusto_tips_entry);
     }
 
     results.push(calc);

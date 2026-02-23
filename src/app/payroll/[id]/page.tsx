@@ -12,11 +12,12 @@ interface HoursWithEmployee {
   bar_hours: number;
   coffee_hours: number;
   wedding_hours: number;
+  labor_hours: number;
   employees: { name: string; role: string };
 }
 
 interface ResultWithEmployee extends PayrollResult {
-  employees: { name: string; role: string; gusto_tips_only: boolean; is_coffee_worker: boolean };
+  employees: { name: string; role: string; gusto_tips_only: boolean; is_coffee_worker: boolean; tip_rate_multiplier: number; hourly_rate: number };
 }
 
 export default function PayrollDetailPage() {
@@ -69,6 +70,9 @@ export default function PayrollDetailPage() {
   if (loading) return <div className="card text-center py-12 text-gray-500">Loading...</div>;
   if (!payroll) return <div className="card text-center py-12 text-gray-500">Payroll not found</div>;
 
+  // Helper to find hours for an employee
+  const getHours = (empId: string) => hours.find(h => h.employee_id === empId);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -111,8 +115,8 @@ export default function PayrollDetailPage() {
             <p className="text-xl font-bold text-pink-700">{fmt(payroll.wedding_tips)}</p>
           </div>
           <div className="bg-emerald-50 rounded-lg p-4">
-            <p className="text-xs text-emerald-600 font-medium uppercase">Total Pool</p>
-            <p className="text-xl font-bold text-emerald-700">{fmt(payroll.total_pool)}</p>
+            <p className="text-xs text-emerald-600 font-medium uppercase">Bar Tip Pool</p>
+            <p className="text-xl font-bold text-emerald-700">{fmt(payroll.bar_tip_pool)}</p>
           </div>
           <div className="bg-blue-50 rounded-lg p-4">
             <p className="text-xs text-blue-600 font-medium uppercase">Final Tip Rate</p>
@@ -132,6 +136,7 @@ export default function PayrollDetailPage() {
                 <th className="py-2 px-2 text-right">Bar Hours</th>
                 <th className="py-2 px-2 text-right">Coffee Hours</th>
                 <th className="py-2 px-2 text-right">Wedding Hours</th>
+                <th className="py-2 px-2 text-right">Labor Hours</th>
               </tr>
             </thead>
             <tbody>
@@ -141,6 +146,7 @@ export default function PayrollDetailPage() {
                   <td className="py-2.5 px-2 text-right">{h.bar_hours > 0 ? h.bar_hours : '—'}</td>
                   <td className="py-2.5 px-2 text-right">{h.coffee_hours > 0 ? h.coffee_hours : '—'}</td>
                   <td className="py-2.5 px-2 text-right">{h.wedding_hours > 0 ? h.wedding_hours : '—'}</td>
+                  <td className="py-2.5 px-2 text-right">{h.labor_hours > 0 ? h.labor_hours : '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -187,28 +193,41 @@ export default function PayrollDetailPage() {
       {results.length > 0 && (
         <div className="card bg-blue-50 border-blue-200">
           <h2 className="font-bold text-blue-900 mb-2">Gusto Entry</h2>
-          <p className="text-sm text-blue-700 mb-4">Enter these amounts into Gusto:</p>
+          <p className="text-sm text-blue-700 mb-4">Enter these in Gusto — Hours (Gusto calculates wages) and Tips (dollar amount):</p>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b-2 border-blue-200 text-left">
                 <th className="py-2 px-2 text-blue-800">Employee</th>
-                <th className="py-2 px-2 text-right text-blue-800">Wages Column</th>
-                <th className="py-2 px-2 text-right text-blue-800">Tips Column</th>
-                <th className="py-2 px-2 text-right text-blue-800">Notes</th>
+                <th className="py-2 px-2 text-right text-blue-800">Hours</th>
+                <th className="py-2 px-2 text-right text-blue-800">Rate</th>
+                <th className="py-2 px-2 text-right text-blue-800">Tips</th>
+                <th className="py-2 px-2 text-right text-blue-800">Top-up</th>
+                <th className="py-2 px-2 text-blue-800">Notes</th>
               </tr>
             </thead>
             <tbody>
-              {results.map(r => (
-                <tr key={r.id} className="border-b border-blue-100">
-                  <td className="py-2.5 px-2 font-medium text-blue-900">{r.employees?.name}</td>
-                  <td className="py-2.5 px-2 text-right font-mono font-bold">{fmt(r.gusto_wages_entry)}</td>
-                  <td className="py-2.5 px-2 text-right font-mono font-bold">{fmt(r.gusto_tips_entry)}</td>
-                  <td className="py-2.5 px-2 text-right text-xs text-blue-600">
-                    {r.employees?.gusto_tips_only && 'All comp as tips'}
-                    {r.employees?.is_coffee_worker && 'Coffee bar'}
-                  </td>
-                </tr>
-              ))}
+              {results.map(r => {
+                const h = getHours(r.employee_id);
+                const isAndrew = r.employees?.gusto_tips_only;
+                const isIndigo = r.employees?.is_coffee_worker;
+                const gustoHours = isAndrew ? (h?.labor_hours || 0) : isIndigo ? (h?.coffee_hours || 0) : (h?.bar_hours || 0);
+                const gustoRate = isAndrew ? 22 : (r.employees?.hourly_rate || 15);
+
+                return (
+                  <tr key={r.id} className="border-b border-blue-100">
+                    <td className="py-2.5 px-2 font-medium text-blue-900">{r.employees?.name}</td>
+                    <td className="py-2.5 px-2 text-right font-mono font-bold">{gustoHours > 0 ? gustoHours : '—'}</td>
+                    <td className="py-2.5 px-2 text-right font-mono text-blue-600">{gustoHours > 0 ? fmt(gustoRate) + '/hr' : '—'}</td>
+                    <td className="py-2.5 px-2 text-right font-mono font-bold">{r.gusto_tips_entry > 0 ? fmt(r.gusto_tips_entry) : '—'}</td>
+                    <td className="py-2.5 px-2 text-right font-mono">{r.top_up_amount > 0 ? fmt(r.top_up_amount) : '—'}</td>
+                    <td className="py-2.5 px-2 text-xs text-blue-600">
+                      {isAndrew && `Labor ${h?.labor_hours || 0}hrs @$22 + bar/wedding comp as tips`}
+                      {isIndigo && 'Coffee bar · $20/hr min'}
+                      {!isAndrew && !isIndigo && (r.employees?.tip_rate_multiplier || 1) < 1 && '25% tip rate'}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -11,7 +11,7 @@ export async function GET(
   const [payrollRes, hoursRes, resultsRes] = await Promise.all([
     supabase.from('weekly_payroll').select('*').eq('id', id).single(),
     supabase.from('employee_weekly_hours').select('*, employees(name, role)').eq('payroll_id', id),
-    supabase.from('payroll_results').select('*, employees(name, role, gusto_tips_only, is_coffee_worker)').eq('payroll_id', id),
+    supabase.from('payroll_results').select('*, employees(name, role, gusto_tips_only, is_coffee_worker, tip_rate_multiplier, hourly_rate)').eq('payroll_id', id),
   ]);
 
   if (payrollRes.error) {
