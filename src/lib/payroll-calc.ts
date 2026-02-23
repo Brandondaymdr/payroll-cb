@@ -4,9 +4,8 @@ import { Employee, EmployeeHoursInput, PayrollCalculation, EmployeePayrollCalc }
  * Core payroll calculation engine for Crowded Barrel / Alchemy bar.
  *
  * Tip Pool Logic:
- * 1. Full pool = toast_tips (bar tips from Toast already include coffee+wedding implicitly,
- *    but coffee_tips and wedding_tips are entered separately)
- * 2. Bar tip pool = toast_tips (coffee and wedding tips are separate line items)
+ * 1. Toast total from POS includes ALL tips (bar + coffee + wedding)
+ * 2. Bar tip pool = toast_tips - coffee_tips - wedding_tips (carve out coffee & wedding)
  * 3. Calculate initial tip rate = bar_tip_pool / total_bar_hours
  * 4. Calculate Josh's reduced share (25% of initial rate × his hours)
  * 5. Remove Josh's share from pool, remove his hours from denominator
@@ -25,8 +24,8 @@ export function calculatePayroll(
 ): PayrollCalculation {
   const fullPool = toastTips + coffeeTips + weddingTips;
 
-  // Bar tip pool is just the toast tips (coffee and wedding are handled separately)
-  const barTipPool = toastTips;
+  // Toast total from POS includes coffee & wedding tips — subtract them to get bar-only pool
+  const barTipPool = toastTips - coffeeTips - weddingTips;
 
   // Build a lookup from employee_id to employee data
   const employeeMap = new Map<string, Employee>();

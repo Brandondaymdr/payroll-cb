@@ -15,18 +15,18 @@ This is a weekly payroll calculation app for **Alchemy**, the bar at Crowded Bar
 ## Core Payroll Logic
 
 ### Weekly Inputs (entered manually each week)
-- Toast total tips (one number for the whole week)
+- Toast total tips (one number for the whole week — this INCLUDES coffee and wedding tips)
 - Each employee's hours worked at the bar
-- Coffee tips total (pulled manually from Toast by shift — Thu/Fri/Sat 7:30–12)
-- Wedding hours and wedding tips (if applicable)
+- Coffee tips total (pulled manually from Toast by shift — Thu/Fri/Sat 7:30–12) — this is a SUBSET of the Toast total
+- Wedding hours and wedding tips (if applicable) — wedding tips are also a SUBSET of the Toast total
 - Indigo's coffee hours (tracked separately)
 
 ### Tip Pool Calculation — Step by Step
 
-1. **Start with**: Toast tips + coffee tips + wedding tips = Full tip pool
-2. **Remove coffee tips**: Pulled out entirely for Indigo (see Indigo rules below)
-3. **Remove wedding tips**: Pulled out entirely for wedding workers (see Wedding rules)
-4. **Remaining pool** is used for bar tip distribution
+1. **Start with**: Toast total from POS (this number already contains coffee + wedding tips)
+2. **Bar tip pool** = Toast total − coffee tips − wedding tips (carve them out since they're distributed separately)
+3. **Coffee tips** → go 100% to Indigo (see Indigo rules below)
+4. **Wedding tips** → go to wedding workers (see Wedding rules)
 5. **Calculate initial tip rate**: Remaining tips ÷ total bar hours (excluding wedding-only hours)
 6. **Remove Josh's share**: Josh gets 25% of the standard tip rate. Calculate (Josh hours × standard rate × 0.25), subtract that dollar amount from the pool, subtract Josh's hours from the tip-hour denominator
 7. **Recalculate final tip rate**: Adjusted pool ÷ adjusted hours
